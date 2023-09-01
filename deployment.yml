@@ -1,3 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config-ini
+data:
+  pgbouncer.ini: |
+    [databases]
+    * = host=postgres-service port=5432 user=postgres
+
+    [pgbouncer]
+    listen_addr = *
+    listen_port = 6432
+    unix_socket_dir =
+    user = postgres
+    auth_file = /etc/pgbouncer/userlist.txt
+    auth_type = md5
+    ignore_startup_parameters = extra_float_digits
+    admin_users = postgres, admin
+  userlist.txt: |
+    "postgres" "SCRAM-SHA-256$4096:BwBnyMOVcAl8AbaDbbdhSA==$AICaQuGEbPSBuo0xsBtETVBBm3wrfZ5mu9vB2ECJAcU=:0F54miUYI/vJxalAgonWhmGqrwVZLxSMg//8ztDicBM="
+    "postgres" "md553f48b7c4b76a86ce72276c5755f217d"
+
+---
+
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -50,14 +74,30 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: postgres-service
 spec:
   type: LoadBalancer
   selector:
     app: pg-bouncer
   ports:
-  - port: 5433
+  - port: 5432
     targetPort: 5432
+    protocol: TCP
+    name: postgres-service
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: pg-bouncer
+  ports:
+  - port: 6432
+    targetPort: 6432
 
 ---
 
@@ -92,7 +132,7 @@ spec:
             - name: POSTGRES_INITDB_ARGS
               value: --auth=md5
           volumeMounts: 
-            - name: postgres-data
+            - name: postgres-data-v
               mountPath: /var/lib/postgresql/data
           resources:
             limits:
@@ -117,10 +157,49 @@ spec:
             initialDelaySeconds: 3
             periodSeconds: 5
             failureThreshold: 1
+        - name: pgbouncer
+          image: edoburu/pgbouncer:latest
+          volumeMounts:
+            - name: pgbouncer-ini-v
+              mountPath: /etc/pgbouncer/pgbouncer.ini
+              subPath: pgbouncer.ini
+            - name: pgbouncer-userlist-v
+              mountPath: /etc/pgbouncer/userlist.txt
+              subPath: userlist.txt
+          ports:
+            - containerPort: 6432
+          env:
+            - name: DB_HOST
+              value: postgres-db
+            - name: DB_PORT
+              value: '5432'
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              value: secret
+            - name: ADMIN_USERS
+              value: postgres, admin
+            - name: AUTH_TYPE
+              value: md5
+            - name: AUTH_FILE
+              value: /etc/pgbouncer/userlist.txt
       volumes: 
-        - name: postgres-data
+        - name: postgres-data-v
           persistentVolumeClaim:
             claimName: postgres-pvc
+        - name: pgbouncer-ini-v
+          configMap:
+            name: pgbouncer-config-ini
+            items:
+              - key: pgbouncer.ini
+                path: pgbouncer.ini
+        - name: pgbouncer-userlist-v
+          configMap:
+            name: pgbouncer-config-ini
+            items:
+              - key: userlist.txt
+                path: userlist.txt
+        
         # - name: nats-data-volume
         #   hostPath:
         #     path: /mnt/wsl/postgres-data
