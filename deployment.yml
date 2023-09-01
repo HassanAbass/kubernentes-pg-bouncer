@@ -101,6 +101,22 @@ spec:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: adminer-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: pg-bouncer
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: adminer-service
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -183,6 +199,11 @@ spec:
               value: md5
             - name: AUTH_FILE
               value: /etc/pgbouncer/userlist.txt
+        - name: adminer
+          image: adminer
+          ports:
+            - name: http
+              containerPort: 8080
       volumes: 
         - name: postgres-data-v
           persistentVolumeClaim:
