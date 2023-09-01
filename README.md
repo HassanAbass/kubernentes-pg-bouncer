@@ -42,4 +42,5 @@ In case you are using WSL you will need to create `postgres-data` directory, the
 1. Using Adminer(light DB management tool), open it using `8080` port [localhost:8080](`http://localhost:8080`)
 
 
+    ![Alt text](image.png)
 
