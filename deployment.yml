@@ -22,6 +22,22 @@ data:
 
 ---
 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-env
+data:
+  DB_HOST: postgres-db
+  DB_PORT: "5432"
+  DB_USER: postgres
+  DB_PASSWORD: secret
+  ADMIN_USERS: postgres, admin
+  AUTH_TYPE: md5
+  AUTH_FILE: /etc/pgbouncer/userlist.txt
+
+
+---
+
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -184,21 +200,9 @@ spec:
               subPath: userlist.txt
           ports:
             - containerPort: 6432
-          env:
-            - name: DB_HOST
-              value: postgres-db
-            - name: DB_PORT
-              value: '5432'
-            - name: DB_USER
-              value: postgres
-            - name: DB_PASSWORD
-              value: secret
-            - name: ADMIN_USERS
-              value: postgres, admin
-            - name: AUTH_TYPE
-              value: md5
-            - name: AUTH_FILE
-              value: /etc/pgbouncer/userlist.txt
+          envFrom:
+            - configMapRef:
+                name: pgbouncer-env
         - name: adminer
           image: adminer
           ports:
